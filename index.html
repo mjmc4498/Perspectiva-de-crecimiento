@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrowthInsight — Evaluación y Predicción Empresarial</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <style>
+        /* Estilos personalizados */
+        body {
+            background-color: var(--bs-body-bg);
+        }
+        .kpi-card {
+            border: none;
+            border-radius: .75rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,.1);
+        }
+        .main-content {
+            display: none;
+        }
+        .main-content.active {
+            display: block;
+        }
+        .chart-container {
+            position: relative;
+            height: 40vh;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="bi bi-bar-chart-line-fill"></i> GrowthInsight</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" data-target="dashboard"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-target="predictions"><i class="bi bi-graph-up-arrow"></i> Predicciones</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-target="reports"><i class="bi bi-file-earmark-text-fill"></i> Reportes</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                     <button id="theme-switcher" class="btn btn-outline-light btn-sm"><i class="bi bi-sun-fill"></i></button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mt-4">
+        <!-- Contenido del Dashboard -->
+        <section id="dashboard" class="main-content active">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2>Dashboard</h2>
+                    <p class="text-muted">Carga tus datos para visualizar el estado actual de tu empresa.</p>
+                </div>
+            </div>
+
+            <!-- Carga de Archivos -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-upload"></i> Cargar Datos (CSV)
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="csv-empleados" class="form-label">Datos de Empleados</label>
+                            <input type="file" class="form-control" id="csv-empleados" accept=".csv">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="csv-financieros" class="form-label">Datos Financieros (Ingresos/Gastos)</label>
+                            <input type="file" class="form-control" id="csv-financieros" accept=".csv">
+                        </div>
+                    </div>
+                     <button id="load-data-btn" class="btn btn-primary mt-3"><i class="bi bi-arrow-clockwise"></i> Cargar y Procesar Datos</button>
+                </div>
+            </div>
+
+            <!-- Alertas -->
+            <div id="alerts-container"></div>
+
+            <!-- KPIs -->
+            <div class="row g-4 mb-4" id="kpi-container">
+                <!-- Las tarjetas de KPI se insertarán aquí -->
+            </div>
+
+            <!-- Gráficos -->
+            <div class="row g-4" id="charts-container">
+                <!-- Los gráficos se insertarán aquí -->
+            </div>
+
+             <!-- Tabla de Datos Crudos -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    Datos Cargados
+                </div>
+                <div class="card-body">
+                    <div id="raw-data-table" class="table-responsive">
+                        <p class="text-muted">Aún no se han cargado datos.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contenido de Predicciones -->
+        <section id="predictions" class="main-content">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2><i class="bi bi-graph-up-arrow"></i> Módulo de Predicciones</h2>
+                    <p class="text-muted">Proyecta el futuro de tu empresa basado en datos históricos.</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    Configurar y Ejecutar Predicción
+                </div>
+                <div class="card-body">
+                     <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label for="prediction-metric" class="form-label">Métrica a Predecir</label>
+                            <select id="prediction-metric" class="form-select">
+                                <option value="employees">Número de Empleados</option>
+                                <option value="revenue">Ingresos</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="prediction-horizon" class="form-label">Horizonte (meses)</label>
+                            <select id="prediction-horizon" class="form-select">
+                                <option value="6">6 meses</option>
+                                <option value="12">12 meses</option>
+                                <option value="24">24 meses</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                             <button id="run-prediction-btn" class="btn btn-success w-100"><i class="bi bi-magic"></i> Ejecutar Predicción</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div id="prediction-results-container">
+                        <!-- Los resultados de la predicción se mostrarán aquí -->
+                    </div>
+                    <div id="prediction-chart-container" class="chart-container mt-3">
+                        <canvas id="predictionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contenido de Reportes -->
+        <section id="reports" class="main-content">
+             <div class="row mb-4">
+                <div class="col-12">
+                    <h2><i class="bi bi-file-earmark-text-fill"></i> Generador de Reportes</h2>
+                    <p class="text-muted">Exporta el estado y las predicciones de tu empresa.</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">Exportar Reporte</div>
+                <div class="card-body text-center">
+                    <p>Genera un reporte en PDF con los KPIs, gráficos y predicciones actuales.</p>
+                    <button id="export-pdf-btn" class="btn btn-danger"><i class="bi bi-file-pdf-fill"></i> Exportar a PDF</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Librerías JS -->
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- PapaParse (para CSV) -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- jsPDF (para PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf-autotable.min.js"></script>
+
+    <!-- Lógica de la aplicación -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const appState = {
+                employees: [],
+                financials: [],
+                activeTheme: 'light',
+                charts: {}
+            };
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const contentSections = document.querySelectorAll('.main-content');
+            const themeSwitcher = document.getElementById('theme-switcher');
+            const loadDataBtn = document.getElementById('load-data-btn');
+
+            // 1. Lógica de Navegación
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetId = link.getAttribute('data-target');
+
+                    if (!targetId) return;
+
+                    navLinks.forEach(navLink => navLink.classList.remove('active'));
+                    link.classList.add('active');
+
+                    contentSections.forEach(section => {
+                        if (section.id === targetId) {
+                            section.classList.add('active');
+                        } else {
+                            section.classList.remove('active');
+                        }
+                    });
+                });
+            });
+
+            // 2. Cambiador de Tema
+            themeSwitcher.addEventListener('click', () => {
+                const newTheme = appState.activeTheme === 'light' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-bs-theme', newTheme);
+                appState.activeTheme = newTheme;
+
+                const icon = themeSwitcher.querySelector('i');
+                if (newTheme === 'dark') {
+                    icon.classList.remove('bi-sun-fill');
+                    icon.classList.add('bi-moon-fill');
+                } else {
+                    icon.classList.remove('bi-moon-fill');
+                    icon.classList.add('bi-sun-fill');
+                }
+
+                // Actualizar gráficos para el nuevo tema
+                Object.values(appState.charts).forEach(chart => {
+                    const isDark = newTheme === 'dark';
+                    const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+                    const textColor = isDark ? '#fff' : '#495057';
+
+                    chart.options.scales.x.grid.color = gridColor;
+                    chart.options.scales.y.grid.color = gridColor;
+                    chart.options.scales.x.ticks.color = textColor;
+                    chart.options.scales.y.ticks.color = textColor;
+                    chart.options.plugins.legend.labels.color = textColor;
+                    chart.update();
+                });
+            });
+
+            // 3. Carga de Datos
+            loadDataBtn.addEventListener('click', () => {
+                const employeeFile = document.getElementById('csv-empleados').files[0];
+                const financialFile = document.getElementById('csv-financieros').files[0];
+
+                if (!employeeFile || !financialFile) {
+                    showAlert('Por favor, selecciona ambos archivos CSV.', 'warning');
+                    return;
+                }
+
+                const promises = [
+                    parseCsv(employeeFile).then(data => { appState.employees = data; }),
+                    parseCsv(financialFile).then(data => { appState.financials = data; })
+                ];
+
+                Promise.all(promises)
+                    .then(() => {
+                        console.log("Datos cargados:", appState);
+                        showAlert('Datos cargados y procesados correctamente.', 'success');
+                        processAndRenderData();
+                    })
+                    .catch(err => {
+                        console.error("Error al cargar los datos:", err);
+                        showAlert(`Error al procesar los archivos: ${err.message}`, 'danger');
+                    });
+            });
+
+            function parseCsv(file) {
+                return new Promise((resolve, reject) => {
+                    Papa.parse(file, {
+                        header: true,
+                        skipEmptyLines: true,
+                        dynamicTyping: true,
+                        complete: (results) => resolve(results.data),
+                        error: (error) => reject(error)
+                    });
+                });
+            }
+
+            function showAlert(message, type = 'info') {
+                const alertsContainer = document.getElementById('alerts-container');
+                const alert = document.createElement('div');
+                alert.className = `alert alert-${type} alert-dismissible fade show`;
+                alert.role = 'alert';
+                alert.innerHTML = `
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                alertsContainer.appendChild(alert);
+            }
+
+            function processAndRenderData() {
+                if (appState.employees.length === 0 || appState.financials.length === 0) {
+                    showAlert('No hay suficientes datos para generar el dashboard.', 'warning');
+                    return;
+                }
+
+                // Limpiar contenedores
+                document.getElementById('kpi-container').innerHTML = '';
+                document.getElementById('charts-container').innerHTML = '';
+                Object.values(appState.charts).forEach(chart => chart.destroy());
+                appState.charts = {};
+
+                renderKpis();
+                renderCharts();
+                renderRawDataTable();
+                checkEarlyWarnings();
+            }
+
+            function renderKpis() {
+                const kpiContainer = document.getElementById('kpi-container');
+                kpiContainer.innerHTML = ''; // Limpiar KPIs anteriores
+
+                // 1. Empleados Actuales
+                const currentDate = new Date();
+                const activeEmployees = appState.employees.filter(e => {
+                    const ingreso = new Date(e.fecha_ingreso);
+                    const salida = e.fecha_salida ? new Date(e.fecha_salida) : null;
+                    return ingreso <= currentDate && (!salida || salida > currentDate);
+                }).length;
+
+                // 2. Ingresos y Gastos (último mes registrado)
+                const lastFinancialRecord = appState.financials.reduce((latest, record) => {
+                    const recordDate = new Date(record.mes);
+                    return !latest || recordDate > new Date(latest.mes) ? record : latest;
+                }, null);
+
+                const lastMonthRevenue = lastFinancialRecord ? lastFinancialRecord.ingresos : 0;
+                const lastMonthExpenses = lastFinancialRecord ? lastFinancialRecord.gastos : 0;
+
+                // 3. Margen Neto
+                const netMargin = lastMonthRevenue > 0 ? ((lastMonthRevenue - lastMonthExpenses) / lastMonthRevenue) * 100 : 0;
+
+                // 4. Tasa de rotación (anualizada simple)
+                const hiresLast12Months = appState.employees.filter(e => (currentDate - new Date(e.fecha_ingreso)) / (1000 * 60 * 60 * 24 * 30.44) <= 12).length;
+                const terminationsLast12Months = appState.employees.filter(e => e.fecha_salida && (currentDate - new Date(e.fecha_salida)) / (1000 * 60 * 60 * 24 * 30.44) <= 12).length;
+                const avgEmployees = (activeEmployees + (activeEmployees - hiresLast12Months + terminationsLast12Months)) / 2;
+                const turnoverRate = avgEmployees > 0 ? (terminationsLast12Months / avgEmployees) * 100 : 0;
+
+                const kpis = [
+                    { label: 'Empleados Actuales', value: activeEmployees, icon: 'bi-people-fill', color: 'primary' },
+                    { label: 'Ingresos (Últ. Mes)', value: `$${(lastMonthRevenue/1000).toFixed(1)}k`, icon: 'bi-cash-stack', color: 'success' },
+                    { label: 'Gastos (Últ. Mes)', value: `$${(lastMonthExpenses/1000).toFixed(1)}k`, icon: 'bi-credit-card-2-front-fill', color: 'warning' },
+                    { label: '% Rotación (Anual)', value: `${turnoverRate.toFixed(1)}%`, icon: 'bi-person-x-fill', color: 'danger' }
+                ];
+
+                kpis.forEach(kpi => {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-3';
+                    col.innerHTML = `
+                        <div class="card kpi-card text-white bg-${kpi.color}">
+                            <div class="card-body d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="card-title mb-0">${kpi.value}</h5>
+                                    <p class="card-text small">${kpi.label}</p>
+                                </div>
+                                <i class="bi ${kpi.icon}" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                            </div>
+                        </div>
+                    `;
+                    kpiContainer.appendChild(col);
+                });
+            }
+
+            function renderCharts() {
+                const chartsContainer = document.getElementById('charts-container');
+                chartsContainer.innerHTML = `
+                    <div class="col-md-12"><div class="card"><div class="card-body"><div class="chart-container"><canvas id="employeeTrendChart"></canvas></div></div><div class="card-footer text-muted text-center small">Evolución de Empleados</div></div></div>
+                    <div class="col-md-6"><div class="card"><div class="card-body"><div class="chart-container"><canvas id="financialsChart"></canvas></div></div><div class="card-footer text-muted text-center small">Ingresos vs. Gastos</div></div></div>
+                    <div class="col-md-6"><div class="card"><div class="card-body"><div class="chart-container"><canvas id="turnoverChart"></canvas></div></div><div class="card-footer text-muted text-center small">Contrataciones vs. Salidas</div></div></div>
+                `;
+
+                renderEmployeeTrendChart();
+                renderFinancialsChart();
+                renderTurnoverChart();
+            }
+
+            function getMonthlyBreakdown() {
+                const monthlyData = {};
+                const processDate = (dateStr) => dateStr ? new Date(dateStr).toISOString().slice(0, 7) : null;
+
+                appState.employees.forEach(e => {
+                    const hireMonth = processDate(e.fecha_ingreso);
+                    if (hireMonth) {
+                        if (!monthlyData[hireMonth]) monthlyData[hireMonth] = { hires: 0, terminations: 0 };
+                        monthlyData[hireMonth].hires++;
+                    }
+
+                    const termMonth = processDate(e.fecha_salida);
+                    if (termMonth) {
+                        if (!monthlyData[termMonth]) monthlyData[termMonth] = { hires: 0, terminations: 0 };
+                        monthlyData[termMonth].terminations++;
+                    }
+                });
+
+                appState.financials.forEach(f => {
+                    const month = processDate(f.mes);
+                    if (month) {
+                        if (!monthlyData[month]) monthlyData[month] = { hires: 0, terminations: 0 };
+                        monthlyData[month].revenue = f.ingresos;
+                        monthlyData[month].expenses = f.gastos;
+                    }
+                });
+
+                const sortedMonths = Object.keys(monthlyData).sort();
+                const labels = [];
+                const datasets = {
+                    hires: [],
+                    terminations: [],
+                    employeeCount: [],
+                    revenue: [],
+                    expenses: []
+                };
+
+                let currentEmployeeCount = 0;
+                for (const month of sortedMonths) {
+                    labels.push(month);
+                    const data = monthlyData[month];
+                    currentEmployeeCount += (data.hires || 0) - (data.terminations || 0);
+
+                    datasets.hires.push(data.hires || 0);
+                    datasets.terminations.push(data.terminations || 0);
+                    datasets.employeeCount.push(currentEmployeeCount);
+                    datasets.revenue.push(data.revenue || 0);
+                    datasets.expenses.push(data.expenses || 0);
+                }
+
+                return { labels, datasets };
+            }
+
+            function renderEmployeeTrendChart() {
+                const { labels, datasets } = getMonthlyBreakdown();
+                const ctx = document.getElementById('employeeTrendChart').getContext('2d');
+                appState.charts.employeeTrend = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Nº de Empleados',
+                            data: datasets.employeeCount,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            fill: true,
+                            tension: 0.1
+                        }]
+                    },
+                    options: getChartOptions('Evolución de Empleados')
+                });
+            }
+
+            function renderFinancialsChart() {
+                const { labels, datasets } = getMonthlyBreakdown();
+                const ctx = document.getElementById('financialsChart').getContext('2d');
+                appState.charts.financials = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Ingresos',
+                                data: datasets.revenue,
+                                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            },
+                            {
+                                label: 'Gastos',
+                                data: datasets.expenses,
+                                backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                            }
+                        ]
+                    },
+                    options: getChartOptions('Ingresos vs. Gastos')
+                });
+            }
+
+            function renderTurnoverChart() {
+                const { labels, datasets } = getMonthlyBreakdown();
+                const ctx = document.getElementById('turnoverChart').getContext('2d');
+                appState.charts.turnover = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Contrataciones',
+                                data: datasets.hires,
+                                backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                            },
+                            {
+                                label: 'Salidas',
+                                data: datasets.terminations,
+                                backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                            }
+                        ]
+                    },
+                    options: getChartOptions('Contrataciones vs. Salidas', true)
+                });
+            }
+
+            function getChartOptions(title, stacked = false) {
+                const isDark = appState.activeTheme === 'dark';
+                const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+                const textColor = isDark ? '#fff' : '#495057';
+
+                return {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { color: textColor }
+                        },
+                        title: {
+                            display: false,
+                            text: title,
+                            color: textColor
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: stacked,
+                            grid: { color: gridColor },
+                            ticks: { color: textColor }
+                        },
+                        y: {
+                            stacked: stacked,
+                            beginAtZero: true,
+                            grid: { color: gridColor },
+                            ticks: { color: textColor }
+                        }
+                    }
+                };
+            }
+
+            function renderRawDataTable() {
+                const container = document.getElementById('raw-data-table');
+                container.innerHTML = `
+                    <h5>Empleados</h5>
+                    <table class="table table-sm table-striped table-hover">
+                        <thead>
+                            <tr>${Object.keys(appState.employees[0]).map(k => `<th>${k}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody>
+                            ${appState.employees.map(row => `<tr>${Object.values(row).map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}
+                        </tbody>
+                    </table>
+                    <h5 class="mt-4">Datos Financieros</h5>
+                    <table class="table table-sm table-striped table-hover">
+                        <thead>
+                            <tr>${Object.keys(appState.financials[0]).map(k => `<th>${k}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody>
+                            ${appState.financials.map(row => `<tr>${Object.values(row).map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            function checkEarlyWarnings() {
+                const alertsContainer = document.getElementById('alerts-container');
+                // Alerta de Tasa de Rotación
+                const kpiCard = document.querySelector('.bg-danger .card-title'); // Busca la tarjeta de rotación
+                if (kpiCard) {
+                    const turnoverRate = parseFloat(kpiCard.textContent);
+                    if (turnoverRate > 15) {
+                         showAlert(`<strong>Alerta Temprana:</strong> La tasa de rotación anualizada (${turnoverRate.toFixed(1)}%) es alta. Se recomienda investigar las causas.`, 'warning');
+                    }
+                }
+
+                // Alerta de Gastos vs Ingresos
+                const { labels, datasets } = getMonthlyBreakdown();
+                if (datasets.revenue.length > 2) {
+                    const lastRevenue = datasets.revenue[datasets.revenue.length - 1];
+                    const prevRevenue = datasets.revenue[datasets.revenue.length - 2];
+                    const lastExpense = datasets.expenses[datasets.expenses.length - 1];
+                    const prevExpense = datasets.expenses[datasets.expenses.length - 2];
+
+                    const revenueGrowth = prevRevenue > 0 ? (lastRevenue - prevRevenue) / prevRevenue : 0;
+                    const expenseGrowth = prevExpense > 0 ? (lastExpense - prevExpense) / prevExpense : 0;
+
+                    if (expenseGrowth > revenueGrowth && lastExpense > lastRevenue) {
+                        showAlert(`<strong>Alerta Temprana:</strong> Los gastos están creciendo más rápido que los ingresos y superan los ingresos del último mes.`, 'warning');
+                    }
+                }
+            }
+
+            // --- Lógica de Predicción ---
+            const runPredictionBtn = document.getElementById('run-prediction-btn');
+            runPredictionBtn.addEventListener('click', () => {
+                const metric = document.getElementById('prediction-metric').value;
+                const horizon = parseInt(document.getElementById('prediction-horizon').value);
+
+                const { labels, datasets } = getMonthlyBreakdown();
+                let historicalData, chart, label;
+
+                if (metric === 'employees') {
+                    historicalData = datasets.employeeCount;
+                    chart = appState.charts.employeeTrend;
+                    label = 'Empleados';
+                } else { // revenue
+                    historicalData = datasets.revenue;
+                    chart = appState.charts.financials; // Podríamos necesitar un gráfico dedicado
+                    label = 'Ingresos';
+                }
+
+                if (historicalData.length < 2) {
+                    showAlert('No hay suficientes datos históricos para realizar una predicción.', 'danger');
+                    return;
+                }
+
+                const timeSeries = historicalData.map((y, x) => ({ x, y }));
+                const regression = linearRegression(timeSeries);
+
+                const lastHistoricalX = timeSeries.length - 1;
+                const lastHistoricalValue = historicalData[lastHistoricalX];
+
+                const futureLabels = [];
+                const predictionData = [];
+                let lastMonthStr = labels[labels.length - 1];
+
+                for (let i = 1; i <= horizon; i++) {
+                    const nextMonth = new Date(lastMonthStr + '-01T12:00:00Z');
+                    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+                    lastMonthStr = nextMonth.toISOString().slice(0, 7);
+                    futureLabels.push(lastMonthStr);
+
+                    const predictedValue = regression.m * (lastHistoricalX + i) + regression.b;
+                    predictionData.push(predictedValue);
+                }
+
+                const finalPredictedValue = predictionData[predictionData.length - 1];
+
+                // Actualizar UI con resultados
+                const resultsContainer = document.getElementById('prediction-results-container');
+                resultsContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <h4 class="alert-heading">Resultados de la Predicción</h4>
+                        <p>Basado en la tendencia histórica, la predicción para <strong>${label}</strong> en los próximos <strong>${horizon} meses</strong> es la siguiente:</p>
+                        <hr>
+                        <p class="mb-0">Se proyecta pasar de <strong>${Math.round(lastHistoricalValue).toLocaleString()}</strong> a <strong>${Math.round(finalPredictedValue).toLocaleString()}</strong> ${label.toLowerCase()}.</p>
+                    </div>
+                `;
+
+                // Renderizar en el gráfico de predicción dedicado
+                renderPredictionChart(labels, historicalData, futureLabels, predictionData, label);
+            });
+
+            function renderPredictionChart(historicalLabels, historicalData, futureLabels, predictionData, metricLabel) {
+                const ctx = document.getElementById('predictionChart').getContext('2d');
+
+                // Destruir gráfico anterior si existe para evitar solapamientos
+                if (appState.charts.prediction) {
+                    appState.charts.prediction.destroy();
+                }
+
+                const fullLabels = [...historicalLabels, ...futureLabels];
+
+                const historicalDataset = {
+                    label: `Histórico de ${metricLabel}`,
+                    data: historicalData,
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    fill: true,
+                    tension: 0.1
+                };
+
+                const predictionDataset = {
+                    label: `Predicción de ${metricLabel}`,
+                    data: new Array(historicalLabels.length).fill(null).concat(predictionData),
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.1
+                };
+
+                appState.charts.prediction = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: fullLabels,
+                        datasets: [historicalDataset, predictionDataset]
+                    },
+                    options: getChartOptions(`Predicción de ${metricLabel}`)
+                });
+            }
+
+            function linearRegression(data) { // data is an array of {x, y}
+                const n = data.length;
+                let sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
+
+                for (let i = 0; i < n; i++) {
+                    sum_x += data[i].x;
+                    sum_y += data[i].y;
+                    sum_xy += (data[i].x * data[i].y);
+                    sum_xx += (data[i].x * data[i].x);
+                }
+
+                const m = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
+                const b = (sum_y - m * sum_x) / n;
+
+                return { m, b }; // y = mx + b
+            }
+
+            // --- Lógica de Reportes ---
+            const exportPdfBtn = document.getElementById('export-pdf-btn');
+            exportPdfBtn.addEventListener('click', async () => {
+                if (appState.employees.length === 0) {
+                    showAlert('Carga los datos antes de generar un reporte.', 'warning');
+                    return;
+                }
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(20);
+                doc.text('GrowthInsight - Reporte Empresarial', 105, 20, { align: 'center' });
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Fecha de generación: ${new Date().toLocaleDateString()}`, 105, 26, { align: 'center' });
+
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Indicadores Clave de Rendimiento (KPIs)', 14, 40);
+
+                // Añadir KPIs
+                const kpiElements = document.querySelectorAll('.kpi-card');
+                let kpiText = '';
+                kpiElements.forEach(card => {
+                    const value = card.querySelector('.card-title').textContent;
+                    const label = card.querySelector('.card-text').textContent;
+                    kpiText += `${label}: ${value}\n`;
+                });
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'normal');
+                doc.text(kpiText, 14, 50);
+
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Gráficos de Tendencias', 14, 80);
+
+                // Añadir Gráficos como imágenes
+                const chartIds = ['employeeTrendChart', 'financialsChart', 'turnoverChart'];
+                let yPos = 90;
+                for (const id of chartIds) {
+                    const canvas = document.getElementById(id);
+                    if (canvas) {
+                        const imgData = canvas.toDataURL('image/png');
+                        const width = id === 'employeeTrendChart' ? 180 : 85;
+                        const height = (canvas.height / canvas.width) * width;
+                        doc.addImage(imgData, 'PNG', 14, yPos, width, height);
+                        yPos += height + 10;
+                    }
+                }
+
+                // Añadir tablas de datos
+                if (appState.employees.length > 0) {
+                    doc.addPage();
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Datos de Empleados', 14, 20);
+                    doc.autoTable({
+                        startY: 25,
+                        head: [Object.keys(appState.employees[0])],
+                        body: appState.employees.map(Object.values),
+                        theme: 'grid',
+                        styles: { fontSize: 8 }
+                    });
+                }
+
+                if (appState.financials.length > 0) {
+                    doc.addPage();
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Datos Financieros', 14, 20);
+                    doc.autoTable({
+                        startY: 25,
+                        head: [Object.keys(appState.financials[0])],
+                        body: appState.financials.map(Object.values),
+                        theme: 'grid',
+                        styles: { fontSize: 8 }
+                    });
+                }
+
+                doc.save(`GrowthInsight_Reporte_${new Date().toISOString().slice(0,10)}.pdf`);
+            });
+
+            console.log("GrowthInsight App Ready!");
+        });
+    </script>
+</body>
+</html>
