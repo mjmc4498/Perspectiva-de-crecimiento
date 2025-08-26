@@ -132,22 +132,30 @@
                 </div>
                 <div class="card-body">
                      <div class="row g-3 align-items-end">
-                        <div class="col-md-4">
-                            <label for="prediction-metric" class="form-label">Métrica a Predecir</label>
+                        <div class="col-md-3">
+                            <label for="prediction-metric" class="form-label">Métrica</label>
                             <select id="prediction-metric" class="form-select">
-                                <option value="employees">Número de Empleados</option>
+                                <option value="employees">Empleados</option>
                                 <option value="revenue">Ingresos</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label for="prediction-horizon" class="form-label">Horizonte (meses)</label>
+                        <div class="col-md-3">
+                            <label for="prediction-horizon" class="form-label">Horizonte</label>
                             <select id="prediction-horizon" class="form-select">
                                 <option value="6">6 meses</option>
                                 <option value="12">12 meses</option>
                                 <option value="24">24 meses</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label for="prediction-scenario" class="form-label">Escenario</label>
+                            <select id="prediction-scenario" class="form-select">
+                                <option value="realistic" selected>Realista</option>
+                                <option value="optimistic">Optimista</option>
+                                <option value="conservative">Conservador</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
                              <button id="run-prediction-btn" class="btn btn-success w-100"><i class="bi bi-magic"></i> Ejecutar Predicción</button>
                         </div>
                     </div>
@@ -159,8 +167,17 @@
                     <div id="prediction-results-container">
                         <!-- Los resultados de la predicción se mostrarán aquí -->
                     </div>
-                    <div id="prediction-chart-container" class="chart-container mt-3">
-                        <canvas id="predictionChart"></canvas>
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <div id="prediction-chart-container" class="chart-container">
+                                <canvas id="predictionChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                             <div id="growth-rate-chart-container" class="chart-container">
+                                <canvas id="growthRateChart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -521,7 +538,7 @@
                 });
             }
 
-            function getChartOptions(title, stacked = false) {
+            function getChartOptions(title, stacked = false, yAxisCallback = null) {
                 const isDark = appState.activeTheme === 'dark';
                 const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
                 const textColor = isDark ? '#fff' : '#495057';
@@ -535,9 +552,10 @@
                             labels: { color: textColor }
                         },
                         title: {
-                            display: false,
+                            display: true,
                             text: title,
-                            color: textColor
+                            color: textColor,
+                            font: { size: 14 }
                         }
                     },
                     scales: {
@@ -548,9 +566,12 @@
                         },
                         y: {
                             stacked: stacked,
-                            beginAtZero: true,
+                            beginAtZero: false,
                             grid: { color: gridColor },
-                            ticks: { color: textColor }
+                            ticks: {
+                                color: textColor,
+                                callback: yAxisCallback ? yAxisCallback : (value) => typeof value === 'number' ? value.toLocaleString() : value
+                            }
                         }
                     }
                 };
@@ -610,105 +631,10 @@
 
             // --- Lógica de Predicción ---
             const runPredictionBtn = document.getElementById('run-prediction-btn');
-            runPredictionBtn.addEventListener('click', () => {
-                const metric = document.getElementById('prediction-metric').value;
-                const horizon = parseInt(document.getElementById('prediction-horizon').value);
 
-                const { labels, datasets } = getMonthlyBreakdown();
-                let historicalData, chart, label;
-
-                if (metric === 'employees') {
-                    historicalData = datasets.employeeCount;
-                    chart = appState.charts.employeeTrend;
-                    label = 'Empleados';
-                } else { // revenue
-                    historicalData = datasets.revenue;
-                    chart = appState.charts.financials; // Podríamos necesitar un gráfico dedicado
-                    label = 'Ingresos';
-                }
-
-                if (historicalData.length < 2) {
-                    showAlert('No hay suficientes datos históricos para realizar una predicción.', 'danger');
-                    return;
-                }
-
-                const timeSeries = historicalData.map((y, x) => ({ x, y }));
-                const regression = linearRegression(timeSeries);
-
-                const lastHistoricalX = timeSeries.length - 1;
-                const lastHistoricalValue = historicalData[lastHistoricalX];
-
-                const futureLabels = [];
-                const predictionData = [];
-                let lastMonthStr = labels[labels.length - 1];
-
-                for (let i = 1; i <= horizon; i++) {
-                    const nextMonth = new Date(lastMonthStr + '-01T12:00:00Z');
-                    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
-                    lastMonthStr = nextMonth.toISOString().slice(0, 7);
-                    futureLabels.push(lastMonthStr);
-
-                    const predictedValue = regression.m * (lastHistoricalX + i) + regression.b;
-                    predictionData.push(predictedValue);
-                }
-
-                const finalPredictedValue = predictionData[predictionData.length - 1];
-
-                // Actualizar UI con resultados
-                const resultsContainer = document.getElementById('prediction-results-container');
-                resultsContainer.innerHTML = `
-                    <div class="alert alert-info">
-                        <h4 class="alert-heading">Resultados de la Predicción</h4>
-                        <p>Basado en la tendencia histórica, la predicción para <strong>${label}</strong> en los próximos <strong>${horizon} meses</strong> es la siguiente:</p>
-                        <hr>
-                        <p class="mb-0">Se proyecta pasar de <strong>${Math.round(lastHistoricalValue).toLocaleString()}</strong> a <strong>${Math.round(finalPredictedValue).toLocaleString()}</strong> ${label.toLowerCase()}.</p>
-                    </div>
-                `;
-
-                // Renderizar en el gráfico de predicción dedicado
-                renderPredictionChart(labels, historicalData, futureLabels, predictionData, label);
-            });
-
-            function renderPredictionChart(historicalLabels, historicalData, futureLabels, predictionData, metricLabel) {
-                const ctx = document.getElementById('predictionChart').getContext('2d');
-
-                // Destruir gráfico anterior si existe para evitar solapamientos
-                if (appState.charts.prediction) {
-                    appState.charts.prediction.destroy();
-                }
-
-                const fullLabels = [...historicalLabels, ...futureLabels];
-
-                const historicalDataset = {
-                    label: `Histórico de ${metricLabel}`,
-                    data: historicalData,
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    fill: true,
-                    tension: 0.1
-                };
-
-                const predictionDataset = {
-                    label: `Predicción de ${metricLabel}`,
-                    data: new Array(historicalLabels.length).fill(null).concat(predictionData),
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    borderDash: [5, 5],
-                    fill: false,
-                    tension: 0.1
-                };
-
-                appState.charts.prediction = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: fullLabels,
-                        datasets: [historicalDataset, predictionDataset]
-                    },
-                    options: getChartOptions(`Predicción de ${metricLabel}`)
-                });
-            }
-
-            function linearRegression(data) { // data is an array of {x, y}
+            function linearRegression(data) {
                 const n = data.length;
+                if (n < 2) return { m: 0, b: 0, stdErr: 0 };
                 let sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
 
                 for (let i = 0; i < n; i++) {
@@ -721,7 +647,145 @@
                 const m = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
                 const b = (sum_y - m * sum_x) / n;
 
-                return { m, b }; // y = mx + b
+                let sum_err_sq = 0;
+                for (let i = 0; i < n; i++) {
+                    const y_pred = m * data[i].x + b;
+                    sum_err_sq += Math.pow(data[i].y - y_pred, 2);
+                }
+                const stdErr = n > 2 ? Math.sqrt(sum_err_sq / (n - 2)) : 0;
+
+                return { m, b, stdErr };
+            }
+
+            runPredictionBtn.addEventListener('click', () => {
+                const metric = document.getElementById('prediction-metric').value;
+                const horizon = parseInt(document.getElementById('prediction-horizon').value);
+                const scenario = document.getElementById('prediction-scenario').value;
+
+                const { labels, datasets } = getMonthlyBreakdown();
+                const historicalData = metric === 'employees' ? datasets.employeeCount : datasets.revenue;
+                const label = metric === 'employees' ? 'Empleados' : 'Ingresos';
+
+                if (historicalData.length < 2) {
+                    showAlert('No hay suficientes datos históricos para una predicción precisa.', 'danger');
+                    return;
+                }
+
+                const timeSeries = historicalData.map((y, x) => ({ x, y }));
+                const { m, b, stdErr } = linearRegression(timeSeries);
+
+                const scenarioMultipliers = { conservative: -0.5, realistic: 0, optimistic: 0.5 };
+                const scenarioFactor = scenarioMultipliers[scenario] * stdErr;
+
+                const lastHistoricalX = timeSeries.length - 1;
+                const lastHistoricalValue = historicalData[lastHistoricalX];
+
+                const futureLabels = [];
+                const predictionData = { lower: [], realistic: [], upper: [] };
+                let lastMonthStr = labels[labels.length - 1];
+
+                for (let i = 1; i <= horizon; i++) {
+                    const nextMonth = new Date(lastMonthStr + '-01T12:00:00Z');
+                    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+                    lastMonthStr = nextMonth.toISOString().slice(0, 7);
+                    futureLabels.push(lastMonthStr);
+
+                    const x_val = lastHistoricalX + i;
+                    const realisticPrediction = m * x_val + b;
+
+                    predictionData.realistic.push(realisticPrediction + scenarioFactor);
+                    predictionData.lower.push(realisticPrediction - stdErr); // Banda de confianza inferior
+                    predictionData.upper.push(realisticPrediction + stdErr); // Banda de confianza superior
+                }
+
+                const finalPredictedValue = predictionData.realistic[predictionData.realistic.length - 1];
+
+                const resultsContainer = document.getElementById('prediction-results-container');
+                resultsContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        <h4 class="alert-heading">Predicción de ${label} (${scenario})</h4>
+                        <p>Proyección a <strong>${horizon} meses</strong>: de <strong>${Math.round(lastHistoricalValue).toLocaleString()}</strong> a <strong>${Math.round(finalPredictedValue).toLocaleString()}</strong> ${label.toLowerCase()}.</p>
+                        <hr>
+                        <p class="mb-0 small text-muted">La banda de confianza (área sombreada) representa el rango probable de resultados con un 68% de confianza.</p>
+                    </div>`;
+
+                renderPredictionChart(labels, historicalData, futureLabels, predictionData, label);
+                renderGrowthRateChart(labels, historicalData, futureLabels, predictionData.realistic, label);
+            });
+
+            function renderPredictionChart(histLabels, histData, futureLabels, predData, metricLabel) {
+                const ctx = document.getElementById('predictionChart').getContext('2d');
+                if (appState.charts.prediction) appState.charts.prediction.destroy();
+
+                const fullLabels = [...histLabels, ...futureLabels];
+
+                appState.charts.prediction = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: fullLabels,
+                        datasets: [
+                            {
+                                label: `Histórico de ${metricLabel}`,
+                                data: histData,
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                fill: true,
+                                tension: 0.1
+                            },
+                             {
+                                label: 'Banda de Confianza',
+                                data: new Array(histLabels.length).fill(null).concat(predData.upper),
+                                fill: '+1', // Fill to next dataset
+                                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                borderColor: 'transparent',
+                                pointRadius: 0,
+                            },
+                            {
+                                label: `Predicción ${metricLabel}`,
+                                data: new Array(histLabels.length).fill(null).concat(predData.realistic),
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                borderDash: [5, 5],
+                                fill: false,
+                                tension: 0.1
+                            },
+                             {
+                                label: 'Banda de Confianza Inferior',
+                                data: new Array(histLabels.length).fill(null).concat(predData.lower),
+                                fill: false,
+                                borderColor: 'transparent',
+                                pointRadius: 0,
+                            },
+                        ]
+                    },
+                    options: getChartOptions(`Predicción de ${metricLabel}`)
+                });
+            }
+
+            function renderGrowthRateChart(histLabels, histData, futureLabels, predData, metricLabel) {
+                const ctx = document.getElementById('growthRateChart').getContext('2d');
+                if (appState.charts.growthRate) appState.charts.growthRate.destroy();
+
+                const fullData = [...histData, ...predData];
+                const growthRates = [];
+                for (let i = 1; i < fullData.length; i++) {
+                    const rate = fullData[i-1] !== 0 ? ((fullData[i] - fullData[i-1]) / fullData[i-1]) * 100 : 0;
+                    growthRates.push(rate);
+                }
+
+                const fullLabels = [...histLabels.slice(1), ...futureLabels];
+
+                appState.charts.growthRate = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: fullLabels,
+                        datasets: [{
+                            label: `% Crecimiento Mensual de ${metricLabel}`,
+                            data: growthRates,
+                            backgroundColor: growthRates.map(d => d >= 0 ? 'rgba(75, 192, 192, 0.6)' : 'rgba(255, 99, 132, 0.6)')
+                        }]
+                    },
+                    options: getChartOptions(`Tasa de Crecimiento Mensual`, false, (value) => `${value.toFixed(1)}%`)
+                });
             }
 
             // --- Lógica de Reportes ---
