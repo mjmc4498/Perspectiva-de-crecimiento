@@ -793,20 +793,16 @@
 
             function getChartAsImageData(canvasId) {
                 const originalCanvas = document.getElementById(canvasId);
-                if (!originalCanvas) return null;
+                if (!originalCanvas || originalCanvas.height === 0) return null;
 
-                // Crear un canvas temporal para no modificar el original
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = originalCanvas.width;
                 tempCanvas.height = originalCanvas.height;
                 const tempCtx = tempCanvas.getContext('2d');
 
-                // El color de fondo dependerá del tema actual para que coincida visualmente
                 const isDark = appState.activeTheme === 'dark';
                 tempCtx.fillStyle = isDark ? '#212529' : 'white';
                 tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-
-                // Dibujar el gráfico original sobre el fondo
                 tempCtx.drawImage(originalCanvas, 0, 0);
 
                 return tempCanvas.toDataURL('image/png');
@@ -820,17 +816,22 @@
 
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('p', 'mm', 'a4');
+                let yPos = 20;
 
+                // --- Página 1: Título y Dashboard ---
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(20);
-                doc.text('GrowthInsight - Reporte Empresarial', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+                doc.text('GrowthInsight - Reporte Empresarial', doc.internal.pageSize.getWidth() / 2, yPos, { align: 'center' });
+                yPos += 6;
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'normal');
-                doc.text(`Fecha de generación: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.getWidth() / 2, 26, { align: 'center' });
+                doc.text(`Fecha de generación: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.getWidth() / 2, yPos, { align: 'center' });
+                yPos += 14;
 
                 doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
-                doc.text('Indicadores Clave de Rendimiento (KPIs)', 14, 40);
+                doc.text('Indicadores Clave de Rendimiento (KPIs)', 14, yPos);
+                yPos += 10;
 
                 const kpiElements = document.querySelectorAll('.kpi-card');
                 let kpiText = '';
@@ -841,16 +842,16 @@
                 });
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'normal');
-                doc.text(kpiText, 14, 50);
+                doc.text(kpiText, 14, yPos);
+                yPos += 25;
 
                 doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
-                doc.text('Gráficos de Tendencias', 14, 75);
+                doc.text('Gráficos de Tendencias Históricas', 14, yPos);
+                yPos += 5;
 
-                const chartIds = ['employeeTrendChart', 'financialsChart', 'turnoverChart'];
-                let yPos = 80;
-
-                for (const id of chartIds) {
+                const dashboardChartIds = ['employeeTrendChart', 'financialsChart', 'turnoverChart'];
+                for (const id of dashboardChartIds) {
                     const imgData = getChartAsImageData(id);
                     if (imgData) {
                         const canvas = document.getElementById(id);
@@ -858,48 +859,69 @@
                         const isFullWidth = id === 'employeeTrendChart';
                         const width = isFullWidth ? doc.internal.pageSize.getWidth() - 28 : (doc.internal.pageSize.getWidth() / 2) - 21;
                         const height = width * aspectRatio;
-
-                        // Centrar los gráficos pequeños
-                        const xPos = isFullWidth ? 14 : (chartIds.indexOf(id) % 2 === 1 ? doc.internal.pageSize.getWidth() / 2 : 14);
+                        const xPos = isFullWidth ? 14 : (dashboardChartIds.indexOf(id) % 2 === 1 ? 14 : doc.internal.pageSize.getWidth() / 2);
 
                         if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
                             doc.addPage();
                             yPos = 20;
                         }
-
                         doc.addImage(imgData, 'PNG', xPos, yPos, width, height);
+                        if (isFullWidth || dashboardChartIds.indexOf(id) % 2 !== 1) yPos += height + 10;
+                    }
+                }
 
-                        if (isFullWidth || chartIds.indexOf(id) % 2 === 0) {
-                           yPos += height + 10;
+                // --- Página 2: Predicciones ---
+                const predictionResult = document.getElementById('prediction-results-container').innerText;
+                if (predictionResult && predictionResult.trim() !== '') {
+                    doc.addPage();
+                    yPos = 20;
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Análisis Predictivo', 14, yPos);
+                    yPos += 10;
+
+                    doc.setFontSize(11);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(doc.splitTextToSize(predictionResult, doc.internal.pageSize.getWidth() - 28), 14, yPos);
+                    yPos += 30;
+
+                    const predictionChartIds = ['predictionChart', 'growthRateChart'];
+                     for (const id of predictionChartIds) {
+                        const imgData = getChartAsImageData(id);
+                        if (imgData) {
+                            const canvas = document.getElementById(id);
+                            const aspectRatio = canvas.height / canvas.width;
+                            const width = id === 'predictionChart' ? doc.internal.pageSize.getWidth() - 28 : (doc.internal.pageSize.getWidth() / 1.5) - 28;
+                            const height = width * aspectRatio;
+
+                            if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            doc.addImage(imgData, 'PNG', 14, yPos, width, height);
+                            yPos += height + 10;
                         }
                     }
                 }
 
+                // --- Páginas Siguientes: Datos Crudos ---
                 if (appState.employees.length > 0) {
                     doc.addPage();
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('Datos de Empleados', 14, 20);
                     doc.autoTable({
                         startY: 25,
                         head: [Object.keys(appState.employees[0])],
                         body: appState.employees.map(row => Object.values(row).map(String)),
-                        theme: 'grid',
-                        styles: { fontSize: 8 }
+                        didDrawPage: (data) => { doc.text('Datos de Empleados', 14, 15); }
                     });
                 }
 
                 if (appState.financials.length > 0) {
-                    if (doc.previousAutoTable.finalY + 20 > doc.internal.pageSize.getHeight() - 20) doc.addPage();
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('Datos Financieros', 14, doc.previousAutoTable.finalY + 15);
+                    doc.addPage();
                     doc.autoTable({
-                        startY: doc.previousAutoTable.finalY + 20,
+                        startY: 25,
                         head: [Object.keys(appState.financials[0])],
                         body: appState.financials.map(row => Object.values(row).map(String)),
-                        theme: 'grid',
-                        styles: { fontSize: 8 }
+                        didDrawPage: (data) => { doc.text('Datos Financieros', 14, 15); }
                     });
                 }
 
