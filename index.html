@@ -726,6 +726,28 @@
 
             // --- Lógica de Reportes ---
             const exportPdfBtn = document.getElementById('export-pdf-btn');
+
+            function getChartAsImageData(canvasId) {
+                const originalCanvas = document.getElementById(canvasId);
+                if (!originalCanvas) return null;
+
+                // Crear un canvas temporal para no modificar el original
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = originalCanvas.width;
+                tempCanvas.height = originalCanvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                // El color de fondo dependerá del tema actual para que coincida visualmente
+                const isDark = appState.activeTheme === 'dark';
+                tempCtx.fillStyle = isDark ? '#212529' : 'white';
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+                // Dibujar el gráfico original sobre el fondo
+                tempCtx.drawImage(originalCanvas, 0, 0);
+
+                return tempCanvas.toDataURL('image/png');
+            }
+
             exportPdfBtn.addEventListener('click', async () => {
                 if (appState.employees.length === 0) {
                     showAlert('Carga los datos antes de generar un reporte.', 'warning');
@@ -733,20 +755,19 @@
                 }
 
                 const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
+                const doc = new jsPDF('p', 'mm', 'a4');
 
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(20);
-                doc.text('GrowthInsight - Reporte Empresarial', 105, 20, { align: 'center' });
+                doc.text('GrowthInsight - Reporte Empresarial', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'normal');
-                doc.text(`Fecha de generación: ${new Date().toLocaleDateString()}`, 105, 26, { align: 'center' });
+                doc.text(`Fecha de generación: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.getWidth() / 2, 26, { align: 'center' });
 
                 doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
                 doc.text('Indicadores Clave de Rendimiento (KPIs)', 14, 40);
 
-                // Añadir KPIs
                 const kpiElements = document.querySelectorAll('.kpi-card');
                 let kpiText = '';
                 kpiElements.forEach(card => {
@@ -760,23 +781,36 @@
 
                 doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
-                doc.text('Gráficos de Tendencias', 14, 80);
+                doc.text('Gráficos de Tendencias', 14, 75);
 
-                // Añadir Gráficos como imágenes
                 const chartIds = ['employeeTrendChart', 'financialsChart', 'turnoverChart'];
-                let yPos = 90;
+                let yPos = 80;
+
                 for (const id of chartIds) {
-                    const canvas = document.getElementById(id);
-                    if (canvas) {
-                        const imgData = canvas.toDataURL('image/png');
-                        const width = id === 'employeeTrendChart' ? 180 : 85;
-                        const height = (canvas.height / canvas.width) * width;
-                        doc.addImage(imgData, 'PNG', 14, yPos, width, height);
-                        yPos += height + 10;
+                    const imgData = getChartAsImageData(id);
+                    if (imgData) {
+                        const canvas = document.getElementById(id);
+                        const aspectRatio = canvas.height / canvas.width;
+                        const isFullWidth = id === 'employeeTrendChart';
+                        const width = isFullWidth ? doc.internal.pageSize.getWidth() - 28 : (doc.internal.pageSize.getWidth() / 2) - 21;
+                        const height = width * aspectRatio;
+
+                        // Centrar los gráficos pequeños
+                        const xPos = isFullWidth ? 14 : (chartIds.indexOf(id) % 2 === 1 ? doc.internal.pageSize.getWidth() / 2 : 14);
+
+                        if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+
+                        doc.addImage(imgData, 'PNG', xPos, yPos, width, height);
+
+                        if (isFullWidth || chartIds.indexOf(id) % 2 === 0) {
+                           yPos += height + 10;
+                        }
                     }
                 }
 
-                // Añadir tablas de datos
                 if (appState.employees.length > 0) {
                     doc.addPage();
                     doc.setFontSize(14);
@@ -785,21 +819,21 @@
                     doc.autoTable({
                         startY: 25,
                         head: [Object.keys(appState.employees[0])],
-                        body: appState.employees.map(Object.values),
+                        body: appState.employees.map(row => Object.values(row).map(String)),
                         theme: 'grid',
                         styles: { fontSize: 8 }
                     });
                 }
 
                 if (appState.financials.length > 0) {
-                    doc.addPage();
+                    if (doc.previousAutoTable.finalY + 20 > doc.internal.pageSize.getHeight() - 20) doc.addPage();
                     doc.setFontSize(14);
                     doc.setFont('helvetica', 'bold');
-                    doc.text('Datos Financieros', 14, 20);
+                    doc.text('Datos Financieros', 14, doc.previousAutoTable.finalY + 15);
                     doc.autoTable({
-                        startY: 25,
+                        startY: doc.previousAutoTable.finalY + 20,
                         head: [Object.keys(appState.financials[0])],
-                        body: appState.financials.map(Object.values),
+                        body: appState.financials.map(row => Object.values(row).map(String)),
                         theme: 'grid',
                         styles: { fontSize: 8 }
                     });
