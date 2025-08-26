@@ -79,10 +79,12 @@
                         <div class="col-md-6">
                             <label for="csv-empleados" class="form-label">Datos de Empleados</label>
                             <input type="file" class="form-control" id="csv-empleados" accept=".csv">
+                            <small class="form-text text-muted mt-1">Columnas requeridas: <code>ID, fecha_ingreso, fecha_salida, rol, area</code>. Las fechas en formato YYYY-MM-DD.</small>
                         </div>
                         <div class="col-md-6">
                             <label for="csv-financieros" class="form-label">Datos Financieros (Ingresos/Gastos)</label>
                             <input type="file" class="form-control" id="csv-financieros" accept=".csv">
+                            <small class="form-text text-muted mt-1">Columnas requeridas: <code>mes, ingresos, gastos</code>. El mes en formato YYYY-MM.</small>
                         </div>
                     </div>
                      <button id="load-data-btn" class="btn btn-primary mt-3"><i class="bi bi-arrow-clockwise"></i> Cargar y Procesar Datos</button>
