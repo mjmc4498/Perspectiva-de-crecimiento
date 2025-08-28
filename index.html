@@ -300,14 +300,21 @@
              <div class="row mb-4">
                 <div class="col-12">
                     <h2><i class="bi bi-file-earmark-text-fill"></i> Generador de Reportes</h2>
-                    <p class="text-muted">Exporta el estado y las predicciones de tu empresa.</p>
+                    <p class="text-muted">Personaliza y exporta el estado y las predicciones de tu empresa.</p>
                 </div>
             </div>
             <div class="card">
-                <div class="card-header">Exportar Reporte</div>
-                <div class="card-body text-center">
-                    <p>Genera un reporte en PDF con los KPIs, gráficos y predicciones actuales.</p>
-                    <button id="export-pdf-btn" class="btn btn-danger"><i class="bi bi-file-pdf-fill"></i> Exportar a PDF</button>
+                <div class="card-header">Configuración del Reporte</div>
+                <div class="card-body">
+                    <div class="mb-3 mx-auto" style="max-width: 400px;">
+                        <label for="company-name" class="form-label">Nombre de la Empresa</label>
+                        <input type="text" class="form-control" id="company-name" placeholder="Para la portada del reporte...">
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                        <p class="text-muted small mb-2">El reporte incluirá un resumen ejecutivo, KPIs, gráficos históricos y todos los análisis disponibles.</p>
+                        <button id="export-pdf-btn" class="btn btn-danger"><i class="bi bi-file-pdf-fill"></i> Generar y Descargar PDF</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1041,23 +1048,65 @@
                 });
             }
 
+            function generateReportSummary() {
+                const { labels, datasets } = getMonthlyBreakdown();
+                if (labels.length < 2) return "No hay suficientes datos para generar un resumen.";
+
+                const last_idx = labels.length - 1;
+                const prev_idx = Math.max(0, last_idx - 1);
+
+                let summary = [];
+
+                // Crecimiento de Empleados
+                const employee_growth = datasets.employeeCount[last_idx] - datasets.employeeCount[0];
+                if (employee_growth > 0) {
+                    summary.push(`La plantilla ha crecido en ${employee_growth} empleados durante el período analizado.`);
+                } else {
+                    summary.push(`La plantilla se ha reducido en ${Math.abs(employee_growth)} empleados.`);
+                }
+
+                // Salud Financiera
+                const last_revenue = datasets.revenue[last_idx];
+                const last_expenses = datasets.expenses[last_idx];
+                if (last_revenue > last_expenses) {
+                    const margin = ((last_revenue - last_expenses) / last_revenue) * 100;
+                    summary.push(`Financieramente, el último mes registró un margen de beneficio del ${margin.toFixed(1)}%.`);
+                } else {
+                    summary.push(`Financieramente, los gastos del último mes superaron a los ingresos.`);
+                }
+
+                // Rotación y Cultura (si hay datos)
+                if (appState.culture && appState.culture.length > 0) {
+                    const last_enps = datasets.eNPS[last_idx];
+                    const last_turnover_rate = datasets.voluntaryTurnoverRate[last_idx];
+
+                    if(last_enps !== null) {
+                        summary.push(`El último eNPS registrado fue de ${last_enps}, un indicador clave del sentimiento del equipo.`);
+                    }
+                    if (last_turnover_rate > 5) { // Umbral de ejemplo
+                        summary.push(`La tasa de rotación voluntaria del ${last_turnover_rate.toFixed(1)}% es un área de atención prioritaria.`);
+                    }
+                } else {
+                     summary.push(`No se cargaron datos de cultura, por lo que el análisis de rotación y sentimiento es limitado.`);
+                }
+
+                return summary.join(' ');
+            }
+
             // --- Lógica de Reportes ---
             const exportPdfBtn = document.getElementById('export-pdf-btn');
 
             function getChartAsImageData(canvasId) {
                 const originalCanvas = document.getElementById(canvasId);
                 if (!originalCanvas || originalCanvas.height === 0) return null;
-
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = originalCanvas.width;
                 tempCanvas.height = originalCanvas.height;
                 const tempCtx = tempCanvas.getContext('2d');
-
                 const isDark = appState.activeTheme === 'dark';
-                tempCtx.fillStyle = isDark ? '#212529' : 'white';
+                tempCtx.fillStyle = isDark ? '#1d232a' : '#ffffff';
                 tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
                 tempCtx.drawImage(originalCanvas, 0, 0);
-
                 return tempCanvas.toDataURL('image/png');
             }
 
@@ -1069,145 +1118,148 @@
 
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('p', 'mm', 'a4');
-                let yPos = 20;
+                const companyName = document.getElementById('company-name').value || 'Mi Empresa';
+                const reportDate = new Date().toLocaleDateString();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const pageWidth = doc.internal.pageSize.getWidth();
+                let yPos = 0;
 
-                // --- Página 1: Título y Dashboard ---
+                const Header = () => {
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('GrowthInsight Report', 14, 15);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(companyName, pageWidth - 14, 15, { align: 'right' });
+                    doc.setDrawColor(var(--border-color));
+                    doc.line(14, 18, pageWidth - 14, 18);
+                };
+
+                const Footer = () => {
+                    const pageCount = doc.internal.getNumberOfPages();
+                    doc.setFontSize(8);
+                    doc.setTextColor(var(--text-muted));
+                    doc.text(`Página ${doc.internal.getCurrentPageInfo().pageNumber} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+                };
+
+                // --- Portada ---
+                doc.setFontSize(28);
                 doc.setFont('helvetica', 'bold');
-                doc.setFontSize(20);
-                doc.text('GrowthInsight - Reporte Empresarial', doc.internal.pageSize.getWidth() / 2, yPos, { align: 'center' });
-                yPos += 6;
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                doc.text(`Fecha de generación: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.getWidth() / 2, yPos, { align: 'center' });
-                yPos += 14;
-
-                doc.setFontSize(14);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Indicadores Clave de Rendimiento (KPIs)', 14, yPos);
-                yPos += 10;
-
-                const kpiElements = document.querySelectorAll('.kpi-card');
-                let kpiText = '';
-                kpiElements.forEach(card => {
-                    const value = card.querySelector('.card-title').textContent;
-                    const label = card.querySelector('.card-text').textContent;
-                    kpiText += `${label}: ${value}\n`;
-                });
+                doc.text('Reporte de Análisis de Crecimiento', pageWidth / 2, 80, { align: 'center' });
+                doc.setFontSize(18);
+                doc.text(companyName, pageWidth / 2, 95, { align: 'center' });
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'normal');
-                doc.text(kpiText, 14, yPos);
-                yPos += 25;
+                doc.text(`Fecha de Generación: ${reportDate}`, pageWidth / 2, 105, { align: 'center' });
 
                 doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
-                doc.text('Gráficos de Tendencias Históricas', 14, yPos);
-                yPos += 5;
+                doc.text('Resumen Ejecutivo', pageWidth / 2, 140, { align: 'center' });
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'normal');
+                const summaryText = generateReportSummary();
+                const splitSummary = doc.splitTextToSize(summaryText, pageWidth - 60);
+                doc.text(splitSummary, pageWidth / 2, 150, { align: 'center' });
 
-                const dashboardChartIds = ['employeeTrendChart', 'financialsChart', 'turnoverChart'];
-                for (const id of dashboardChartIds) {
-                    const imgData = getChartAsImageData(id);
-                    if (imgData) {
-                        const canvas = document.getElementById(id);
-                        const aspectRatio = canvas.height / canvas.width;
-                        const isFullWidth = id === 'employeeTrendChart';
-                        const width = isFullWidth ? doc.internal.pageSize.getWidth() - 28 : (doc.internal.pageSize.getWidth() / 2) - 21;
-                        const height = width * aspectRatio;
-                        const xPos = isFullWidth ? 14 : (dashboardChartIds.indexOf(id) % 2 === 1 ? 14 : doc.internal.pageSize.getWidth() / 2);
-
-                        if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                        doc.addImage(imgData, 'PNG', xPos, yPos, width, height);
-                        if (isFullWidth || dashboardChartIds.indexOf(id) % 2 !== 1) yPos += height + 10;
-                    }
-                }
-
-                // --- Página 2: Predicciones ---
-                const predictionResult = document.getElementById('prediction-results-container').innerText;
-                if (predictionResult && predictionResult.trim() !== '') {
+                // --- Función para añadir contenido con Header/Footer ---
+                const addContentPage = (title, drawContent) => {
                     doc.addPage();
-                    yPos = 20;
-                    doc.setFontSize(14);
+                    Header();
+                    doc.setFontSize(18);
                     doc.setFont('helvetica', 'bold');
-                    doc.text('Análisis Predictivo', 14, yPos);
-                    yPos += 10;
+                    doc.setTextColor(var(--text-base));
+                    doc.text(title, 14, 30);
+                    yPos = 40;
+                    drawContent(yPos);
+                    Footer();
+                };
 
-                    doc.setFontSize(11);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(doc.splitTextToSize(predictionResult, doc.internal.pageSize.getWidth() - 28), 14, yPos);
-                    yPos += 30;
+                // --- Página de KPIs y Gráficos Históricos ---
+                addContentPage('Dashboard General', (y) => {
+                    const kpiElements = document.querySelectorAll('.kpi-card');
+                    let kpiText = '';
+                    kpiElements.forEach(card => {
+                        kpiText += `${card.querySelector('.small').textContent}: ${card.querySelector('.fw-bold').textContent}\n`;
+                    });
+                    doc.setFontSize(12);
+                    doc.text(kpiText, 14, y);
+                    y += 30;
 
-                    const predictionChartIds = ['predictionChart', 'growthRateChart'];
-                     for (const id of predictionChartIds) {
+                    const dashboardChartIds = ['employeeTrendChart', 'financialsChart', 'turnoverChart'];
+                    dashboardChartIds.forEach(id => {
                         const imgData = getChartAsImageData(id);
                         if (imgData) {
                             const canvas = document.getElementById(id);
-                            const aspectRatio = canvas.height / canvas.width;
-                            const width = id === 'predictionChart' ? doc.internal.pageSize.getWidth() - 28 : (doc.internal.pageSize.getWidth() / 1.5) - 28;
-                            const height = width * aspectRatio;
-
-                            if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            doc.addImage(imgData, 'PNG', 14, yPos, width, height);
-                            yPos += height + 10;
+                            const ar = canvas.height / canvas.width;
+                            const width = pageWidth - 28;
+                            const height = width * ar;
+                            if (y + height > pageHeight - 20) { doc.addPage(); Header(); y = 30; }
+                            doc.addImage(imgData, 'PNG', 14, y, width, height);
+                            y += height + 10;
                         }
-                    }
+                    });
+                });
+
+                // --- Página de Predicciones ---
+                if (document.getElementById('prediction-results-container').innerText.trim()) {
+                    addContentPage('Análisis Predictivo', (y) => {
+                        const predText = document.getElementById('prediction-results-container').innerText;
+                        doc.setFontSize(11);
+                        doc.text(doc.splitTextToSize(predText, pageWidth - 28), 14, y);
+                        y += 25;
+                        ['predictionChart', 'growthRateChart'].forEach(id => {
+                            const imgData = getChartAsImageData(id);
+                            if(imgData) {
+                                const canvas = document.getElementById(id);
+                                const ar = canvas.height / canvas.width;
+                                const width = pageWidth - 28;
+                                const height = width * ar;
+                                if (y + height > pageHeight - 20) { doc.addPage(); Header(); y = 30; }
+                                doc.addImage(imgData, 'PNG', 14, y, width, height);
+                                y += height + 10;
+                            }
+                        });
+                    });
                 }
 
-                // --- Página 3: Cultura y Talento ---
+                // --- Página de Cultura ---
                 if (appState.culture && appState.culture.length > 0) {
-                    doc.addPage();
-                    yPos = 20;
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('Análisis de Cultura y Talento', 14, yPos);
-                    yPos += 10;
-
-                    const cultureChartIds = ['enpsCorrelationChart', 'turnoverBreakdownChart'];
-                    for (const id of cultureChartIds) {
-                        const imgData = getChartAsImageData(id);
-                        if (imgData) {
-                            const canvas = document.getElementById(id);
-                            const aspectRatio = canvas.height / canvas.width;
-                            const width = (doc.internal.pageSize.getWidth() - 35) / 2; // Two charts side-by-side
-                            const height = width * aspectRatio;
-                            const xPos = cultureChartIds.indexOf(id) === 0 ? 14 : doc.internal.pageSize.getWidth() / 2 + 3;
-
-                            if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
-                                doc.addPage();
-                                yPos = 20;
+                     addContentPage('Análisis de Cultura y Talento', (y) => {
+                        ['enpsCorrelationChart', 'turnoverBreakdownChart'].forEach(id => {
+                             const imgData = getChartAsImageData(id);
+                            if(imgData) {
+                                const canvas = document.getElementById(id);
+                                const ar = canvas.height / canvas.width;
+                                const width = pageWidth - 28;
+                                const height = width * ar;
+                                if (y + height > pageHeight - 20) { doc.addPage(); Header(); y = 30; }
+                                doc.addImage(imgData, 'PNG', 14, y, width, height);
+                                y += height + 10;
                             }
-                            doc.addImage(imgData, 'PNG', xPos, yPos, width, height);
+                        });
+                    });
+                }
+
+                // --- Páginas de Datos Crudos ---
+                const addTablePage = (title, data) => {
+                    doc.addPage();
+                    doc.autoTable({
+                        head: [Object.keys(data[0])],
+                        body: data.map(row => Object.values(row).map(String)),
+                        startY: 35,
+                        didDrawPage: (data) => {
+                            Header();
+                            doc.setFontSize(18);
+                            doc.text(title, 14, 30);
+                            Footer();
                         }
-                    }
-                    yPos += 80; // Increment yPos after placing side-by-side charts
-                }
-
-                // --- Páginas Siguientes: Datos Crudos ---
-                if (appState.employees.length > 0) {
-                    doc.addPage();
-                    doc.autoTable({
-                        startY: 25,
-                        head: [Object.keys(appState.employees[0])],
-                        body: appState.employees.map(row => Object.values(row).map(String)),
-                        didDrawPage: (data) => { doc.text('Datos de Empleados', 14, 15); }
                     });
-                }
+                };
+                if (appState.employees.length > 0) addTablePage('Datos Crudos: Empleados', appState.employees);
+                if (appState.financials.length > 0) addTablePage('Datos Crudos: Financieros', appState.financials);
 
-                if (appState.financials.length > 0) {
-                    doc.addPage();
-                    doc.autoTable({
-                        startY: 25,
-                        head: [Object.keys(appState.financials[0])],
-                        body: appState.financials.map(row => Object.values(row).map(String)),
-                        didDrawPage: (data) => { doc.text('Datos Financieros', 14, 15); }
-                    });
-                }
+                doc.deletePage(doc.internal.getNumberOfPages()); // Eliminar la última página en blanco que a veces se añade
 
-                doc.save(`GrowthInsight_Reporte_${new Date().toISOString().slice(0,10)}.pdf`);
+                doc.save(`Reporte_GrowthInsight_${companyName.replace(/\s/g, '_')}_${reportDate}.pdf`);
             });
 
             console.log("GrowthInsight App Ready!");
