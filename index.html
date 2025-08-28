@@ -11,96 +11,108 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
         :root {
-            --bg-color: #e0e5ec;
-            --primary-color: #0d6efd;
-            --text-color: #5b6473;
-            --light-shadow: rgba(255, 255, 255, 0.9);
-            --dark-shadow: rgba(163, 177, 198, 0.6);
-            --border-radius: 15px;
+            --bg-base: #ffffff;
+            --bg-muted: #f9fafb;
+            --text-base: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --primary: #3b82f6;
+            --primary-content: #ffffff;
+            --secondary: #6b7280;
+            --secondary-content: #ffffff;
+            --border-radius: 0.75rem;
+            --box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
 
         [data-bs-theme="dark"] {
-            --bg-color: #2c3038;
-            --text-color: #a3a9b3;
-            --light-shadow: rgba(56, 62, 72, 0.8);
-            --dark-shadow: rgba(10, 10, 10, 0.4);
+            --bg-base: #1d232a;
+            --bg-muted: #191e24;
+            --text-base: #d1d5db;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --primary: #60a5fa;
+            --primary-content: #1d232a;
+            --secondary: #4b5563;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-muted);
+            color: var(--text-base);
+            font-family: 'Inter', sans-serif;
             transition: background-color 0.3s ease;
         }
 
         .navbar {
-            background-color: var(--bg-color) !important;
-            box-shadow: 6px 6px 12px var(--dark-shadow), -6px -6px 12px var(--light-shadow);
+            background-color: var(--bg-base) !important;
+            box-shadow: var(--box-shadow);
+            border-bottom: 1px solid var(--border-color);
         }
 
+        .navbar-brand {
+            font-weight: 700;
+        }
         .navbar-brand, .nav-link {
-            color: var(--text-color) !important;
+            color: var(--text-muted) !important;
+            transition: color 0.2s ease;
         }
-
+        .nav-link:hover {
+             color: var(--text-base) !important;
+        }
         .nav-link.active {
-            font-weight: bold;
-            color: var(--primary-color) !important;
+            font-weight: 600;
+            color: var(--primary) !important;
+            border-bottom: 2px solid var(--primary);
         }
 
         .card {
-            background-color: var(--bg-color);
+            background-color: var(--bg-base);
             border-radius: var(--border-radius);
-            border: none;
-            box-shadow: 6px 6px 12px var(--dark-shadow), -6px -6px 12px var(--light-shadow);
-            transition: all 0.3s ease;
-        }
-
-        .kpi-card:hover {
-            box-shadow: inset 4px 4px 8px var(--dark-shadow), inset -4px -4px 8px var(--light-shadow);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--box-shadow);
         }
 
         .btn {
-            border-radius: 10px;
-            border: none;
-            box-shadow: 4px 4px 8px var(--dark-shadow), -4px -4px 8px var(--light-shadow);
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            border-radius: 0.5rem;
             font-weight: 600;
             transition: all 0.2s ease-in-out;
+            border: 1px solid transparent;
         }
-
-        .btn:hover {
-            box-shadow: 2px 2px 4px var(--dark-shadow), -2px -2px 4px var(--light-shadow);
-            color: var(--primary-color);
-        }
-
-        .btn:active, .btn.active {
-            box-shadow: inset 4px 4px 8px var(--dark-shadow), inset -4px -4px 8px var(--light-shadow);
-            color: var(--primary-color);
-        }
-
         .btn-primary {
-            color: var(--primary-color);
+            background-color: var(--primary);
+            color: var(--primary-content);
+            border-color: var(--primary);
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
         }
         .btn-success {
-            color: #198754;
+            background-color: #22c55e;
+            color: white;
         }
         .btn-danger {
-            color: #dc3545;
+            background-color: #ef4444;
+            color: white;
+        }
+        #theme-switcher {
+            background-color: var(--bg-muted);
+            color: var(--text-muted);
+            border-color: var(--border-color);
         }
 
         .form-control, .form-select {
-            border-radius: 10px;
-            border: none;
-            background-color: var(--bg-color);
-            box-shadow: inset 3px 3px 6px var(--dark-shadow), inset -3px -3px 6px var(--light-shadow);
-            color: var(--text-color);
+            border-radius: 0.5rem;
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-color);
+            color: var(--text-base);
         }
         .form-control:focus, .form-select:focus {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            box-shadow: inset 2px 2px 4px var(--dark-shadow), inset -2px -2px 4px var(--light-shadow);
+            background-color: var(--bg-base);
+            color: var(--text-base);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
         }
 
         .main-content {
@@ -114,9 +126,6 @@
             height: 40vh;
             width: 100%;
         }
-
-        /* Add Google Font */
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
     </style>
 </head>
 <body>
