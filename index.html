@@ -77,15 +77,20 @@
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <label for="csv-empleados" class="form-label">Datos de Empleados</label>
-                            <input type="file" class="form-control" id="csv-empleados" accept=".csv">
-                            <small class="form-text text-muted mt-1">Columnas requeridas: <code>ID, fecha_ingreso, fecha_salida, rol, area</code>. Las fechas en formato YYYY-MM-DD.</small>
+                        <div class="col-md-4">
+                            <label for="csv-empleados" class="form-label fw-bold">1. Datos de Empleados</label>
+                            <input type="file" class="form-control" id="csv-empleados" accept=".csv" required>
+                            <small class="form-text text-muted mt-1">Req: <code>ID, fecha_ingreso, fecha_salida, tipo_salida</code></small>
                         </div>
-                        <div class="col-md-6">
-                            <label for="csv-financieros" class="form-label">Datos Financieros (Ingresos/Gastos)</label>
-                            <input type="file" class="form-control" id="csv-financieros" accept=".csv">
-                            <small class="form-text text-muted mt-1">Columnas requeridas: <code>mes, ingresos, gastos</code>. El mes en formato YYYY-MM.</small>
+                        <div class="col-md-4">
+                            <label for="csv-financieros" class="form-label fw-bold">2. Datos Financieros</label>
+                            <input type="file" class="form-control" id="csv-financieros" accept=".csv" required>
+                            <small class="form-text text-muted mt-1">Req: <code>mes, ingresos, gastos</code></small>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="csv-cultura" class="form-label fw-bold">3. Datos de Cultura (Opcional)</label>
+                            <input type="file" class="form-control" id="csv-cultura" accept=".csv">
+                            <small class="form-text text-muted mt-1">Req: <code>mes, eNPS, promociones</code></small>
                         </div>
                     </div>
                      <button id="load-data-btn" class="btn btn-primary mt-3"><i class="bi bi-arrow-clockwise"></i> Cargar y Procesar Datos</button>
@@ -103,6 +108,18 @@
             <!-- Gráficos -->
             <div class="row g-4" id="charts-container">
                 <!-- Los gráficos se insertarán aquí -->
+            </div>
+
+            <!-- Sección de Cultura y Talento -->
+            <div id="culture-charts-section" class="mt-5" style="display: none;">
+                <div class="row mb-2">
+                    <div class="col-12">
+                        <h2 class="border-bottom pb-2 mb-3">Análisis de Cultura y Talento</h2>
+                    </div>
+                </div>
+                <div class="row g-4" id="culture-charts-container">
+                    <!-- Los gráficos de cultura se insertarán aquí -->
+                </div>
             </div>
 
              <!-- Tabla de Datos Crudos -->
@@ -284,16 +301,24 @@
             loadDataBtn.addEventListener('click', () => {
                 const employeeFile = document.getElementById('csv-empleados').files[0];
                 const financialFile = document.getElementById('csv-financieros').files[0];
+                const cultureFile = document.getElementById('csv-cultura').files[0];
 
                 if (!employeeFile || !financialFile) {
-                    showAlert('Por favor, selecciona ambos archivos CSV.', 'warning');
+                    showAlert('Por favor, selecciona al menos los archivos de Empleados y Financieros.', 'warning');
                     return;
                 }
+
+                // Resetear estado antes de cargar nuevos datos
+                Object.assign(appState, { employees: [], financials: [], culture: [], charts: {} });
 
                 const promises = [
                     parseCsv(employeeFile).then(data => { appState.employees = data; }),
                     parseCsv(financialFile).then(data => { appState.financials = data; })
                 ];
+
+                if (cultureFile) {
+                    promises.push(parseCsv(cultureFile).then(data => { appState.culture = data; }));
+                }
 
                 Promise.all(promises)
                     .then(() => {
@@ -347,6 +372,75 @@
                 renderCharts();
                 renderRawDataTable();
                 checkEarlyWarnings();
+
+                if (appState.culture && appState.culture.length > 0) {
+                    document.getElementById('culture-charts-section').style.display = 'block';
+                    renderCultureCharts();
+                } else {
+                    document.getElementById('culture-charts-section').style.display = 'none';
+                }
+            }
+
+            function renderCultureCharts() {
+                const container = document.getElementById('culture-charts-container');
+                container.innerHTML = `
+                    <div class="col-md-8"><div class="card"><div class="card-body"><div class="chart-container"><canvas id="enpsCorrelationChart"></canvas></div></div></div></div>
+                    <div class="col-md-4"><div class="card"><div class="card-body"><div class="chart-container"><canvas id="turnoverBreakdownChart"></canvas></div></div></div></div>
+                `;
+                renderEnpsCorrelationChart();
+                renderTurnoverBreakdownChart();
+            }
+
+            function renderEnpsCorrelationChart() {
+                const { labels, datasets } = getMonthlyBreakdown();
+                const ctx = document.getElementById('enpsCorrelationChart').getContext('2d');
+                appState.charts.enpsCorrelation = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Tasa de Rotación Voluntaria (%)',
+                                data: datasets.voluntaryTurnoverRate,
+                                yAxisID: 'y1',
+                                backgroundColor: 'rgba(255, 99, 132, 0.6)'
+                            },
+                             {
+                                label: 'eNPS',
+                                data: datasets.eNPS,
+                                yAxisID: 'y',
+                                type: 'line',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                tension: 0.2
+                            }
+                        ]
+                    },
+                    options: getChartOptions('Correlación eNPS vs. Rotación Voluntaria', false, null, true)
+                });
+            }
+
+            function renderTurnoverBreakdownChart() {
+                const { labels, datasets } = getMonthlyBreakdown();
+                const ctx = document.getElementById('turnoverBreakdownChart').getContext('2d');
+                appState.charts.turnoverBreakdown = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Salidas Voluntarias',
+                                data: datasets.terminations_voluntary,
+                                backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                            },
+                            {
+                                label: 'Salidas Involuntarias',
+                                data: datasets.terminations_involuntary,
+                                backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                            }
+                        ]
+                    },
+                    options: getChartOptions('Desglose de Salidas', true)
+                });
             }
 
             function renderKpis() {
@@ -421,50 +515,94 @@
                 const monthlyData = {};
                 const processDate = (dateStr) => dateStr ? new Date(dateStr).toISOString().slice(0, 7) : null;
 
+                const initializeMonth = (month) => {
+                    if (!monthlyData[month]) {
+                        monthlyData[month] = {
+                            hires: 0,
+                            terminations: 0,
+                            terminations_voluntary: 0,
+                            terminations_involuntary: 0,
+                            eNPS: null,
+                            promotions: 0
+                        };
+                    }
+                };
+
                 appState.employees.forEach(e => {
                     const hireMonth = processDate(e.fecha_ingreso);
                     if (hireMonth) {
-                        if (!monthlyData[hireMonth]) monthlyData[hireMonth] = { hires: 0, terminations: 0 };
+                        initializeMonth(hireMonth);
                         monthlyData[hireMonth].hires++;
                     }
 
                     const termMonth = processDate(e.fecha_salida);
                     if (termMonth) {
-                        if (!monthlyData[termMonth]) monthlyData[termMonth] = { hires: 0, terminations: 0 };
+                        initializeMonth(termMonth);
                         monthlyData[termMonth].terminations++;
+                        if (e.tipo_salida === 'voluntaria') {
+                            monthlyData[termMonth].terminations_voluntary++;
+                        } else if (e.tipo_salida === 'involuntaria') {
+                            monthlyData[termMonth].terminations_involuntary++;
+                        }
                     }
                 });
 
                 appState.financials.forEach(f => {
                     const month = processDate(f.mes);
                     if (month) {
-                        if (!monthlyData[month]) monthlyData[month] = { hires: 0, terminations: 0 };
+                        initializeMonth(month);
                         monthlyData[month].revenue = f.ingresos;
                         monthlyData[month].expenses = f.gastos;
                     }
                 });
+
+                if (appState.culture) {
+                    appState.culture.forEach(c => {
+                        const month = processDate(c.mes);
+                        if (month) {
+                            initializeMonth(month);
+                            monthlyData[month].eNPS = c.eNPS;
+                            monthlyData[month].promotions = c.promociones;
+                        }
+                    });
+                }
 
                 const sortedMonths = Object.keys(monthlyData).sort();
                 const labels = [];
                 const datasets = {
                     hires: [],
                     terminations: [],
+                    terminations_voluntary: [],
+                    terminations_involuntary: [],
                     employeeCount: [],
                     revenue: [],
-                    expenses: []
+                    expenses: [],
+                    eNPS: [],
+                    promotions: [],
+                    voluntaryTurnoverRate: []
                 };
 
                 let currentEmployeeCount = 0;
+                let previousEmployeeCount = 0;
                 for (const month of sortedMonths) {
                     labels.push(month);
                     const data = monthlyData[month];
+                    previousEmployeeCount = currentEmployeeCount;
                     currentEmployeeCount += (data.hires || 0) - (data.terminations || 0);
+
+                    const avgEmployees = (previousEmployeeCount + currentEmployeeCount) / 2;
+                    const voluntaryRate = avgEmployees > 0 ? ((data.terminations_voluntary || 0) / avgEmployees) * 100 : 0;
 
                     datasets.hires.push(data.hires || 0);
                     datasets.terminations.push(data.terminations || 0);
+                    datasets.terminations_voluntary.push(data.terminations_voluntary || 0);
+                    datasets.terminations_involuntary.push(data.terminations_involuntary || 0);
                     datasets.employeeCount.push(currentEmployeeCount);
                     datasets.revenue.push(data.revenue || 0);
                     datasets.expenses.push(data.expenses || 0);
+                    datasets.eNPS.push(data.eNPS);
+                    datasets.promotions.push(data.promotions || 0);
+                    datasets.voluntaryTurnoverRate.push(voluntaryRate);
                 }
 
                 return { labels, datasets };
@@ -538,10 +676,45 @@
                 });
             }
 
-            function getChartOptions(title, stacked = false, yAxisCallback = null) {
+            function getChartOptions(title, stacked = false, yAxisCallback = null, dualAxis = false) {
                 const isDark = appState.activeTheme === 'dark';
                 const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
                 const textColor = isDark ? '#fff' : '#495057';
+
+                const scales = {
+                    x: {
+                        stacked: stacked,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        stacked: stacked,
+                        beginAtZero: false,
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            callback: yAxisCallback ? yAxisCallback : (value) => typeof value === 'number' ? value.toLocaleString() : value
+                        }
+                    }
+                };
+
+                if (dualAxis) {
+                    scales.y1 = {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: {
+                            drawOnChartArea: false, // No superponer la rejilla
+                        },
+                        ticks: {
+                            color: textColor,
+                            callback: (value) => `${value.toFixed(1)}%` // Asumimos que el segundo eje es un %
+                        }
+                    };
+                }
 
                 return {
                     responsive: true,
@@ -558,22 +731,7 @@
                             font: { size: 14 }
                         }
                     },
-                    scales: {
-                        x: {
-                            stacked: stacked,
-                            grid: { color: gridColor },
-                            ticks: { color: textColor }
-                        },
-                        y: {
-                            stacked: stacked,
-                            beginAtZero: false,
-                            grid: { color: gridColor },
-                            ticks: {
-                                color: textColor,
-                                callback: yAxisCallback ? yAxisCallback : (value) => typeof value === 'number' ? value.toLocaleString() : value
-                            }
-                        }
-                    }
+                    scales: scales
                 };
             }
 
@@ -902,6 +1060,35 @@
                             yPos += height + 10;
                         }
                     }
+                }
+
+                // --- Página 3: Cultura y Talento ---
+                if (appState.culture && appState.culture.length > 0) {
+                    doc.addPage();
+                    yPos = 20;
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Análisis de Cultura y Talento', 14, yPos);
+                    yPos += 10;
+
+                    const cultureChartIds = ['enpsCorrelationChart', 'turnoverBreakdownChart'];
+                    for (const id of cultureChartIds) {
+                        const imgData = getChartAsImageData(id);
+                        if (imgData) {
+                            const canvas = document.getElementById(id);
+                            const aspectRatio = canvas.height / canvas.width;
+                            const width = (doc.internal.pageSize.getWidth() - 35) / 2; // Two charts side-by-side
+                            const height = width * aspectRatio;
+                            const xPos = cultureChartIds.indexOf(id) === 0 ? 14 : doc.internal.pageSize.getWidth() / 2 + 3;
+
+                            if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
+                                doc.addPage();
+                                yPos = 20;
+                            }
+                            doc.addImage(imgData, 'PNG', xPos, yPos, width, height);
+                        }
+                    }
+                    yPos += 80; // Increment yPos after placing side-by-side charts
                 }
 
                 // --- Páginas Siguientes: Datos Crudos ---
